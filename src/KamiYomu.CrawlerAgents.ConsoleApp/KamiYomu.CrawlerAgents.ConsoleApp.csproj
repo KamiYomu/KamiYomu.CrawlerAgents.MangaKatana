@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.22.1" />
+    <PackageReference Include="Spectre.Console" Version="0.53.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KamiYomu.CrawlerAgents.MangaKatana\KamiYomu.CrawlerAgents.MangaKatana.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="KamiYomu.CrawlerAgents.Core">
+      <HintPath>..\..\..\KamiYomu.CrawlerAgents.Core\src\KamiYomu.CrawlerAgents.Core\bin\Debug\netstandard2.0\KamiYomu.CrawlerAgents.Core.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>
