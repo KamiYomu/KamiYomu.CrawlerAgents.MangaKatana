@@ -170,7 +170,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
         private IEnumerable<Page> ConvertToChapterPages(Chapter chapter, HtmlNodeCollection pageNodes)
         {
             if (pageNodes == null)
-                return Enumerable.Empty<Page>();
+                return [];
 
             var pages = new List<Page>();
 
@@ -179,7 +179,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
                 var idAttr = node.GetAttributeValue("id", "");
                 if (!idAttr.StartsWith("page")) continue;
 
-                if (!int.TryParse(idAttr.Substring(4), out int pageNumber))
+                if (!decimal.TryParse(idAttr.Substring(4), out decimal pageNumber))
                     continue;
 
                 var imgNode = node.SelectSingleNode(".//img");
@@ -192,7 +192,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
 
                 var page = PageBuilder.Create()
                                       .WithChapterId(chapter.Id)
-                                      .WithId(idAttr) // or any other ID logic
+                                      .WithId(idAttr) 
                                       .WithPageNumber(pageNumber)
                                       .WithImageUrl(new Uri(imageUrl))
                                       .WithParentChapter(chapter)
@@ -299,7 +299,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
             var match = Regex.Match(latestChapter ?? "", @"([\d\.]+)");
             var chapterNumber = match.Success ? match.Groups[1].Value : "0";
 
-            var latestChapterInt = (int)Math.Floor(Convert.ToDecimal(chapterNumber));
+            var latestChapterDecimal = decimal.TryParse(chapterNumber, out var result) ? result : 0m;
 
             // Build Manga object
             mangaBuilder
@@ -310,7 +310,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
                 .WithCoverFileName(Path.GetFileName(coverUrl))
                 .WithCoverUrl(new Uri(coverUrl))
                 .WithTags([.. genres])
-                .WithLatestChapterAvailable(latestChapterInt)
+                .WithLatestChapterAvailable(latestChapterDecimal)
                 .WithReleaseStatus(status?.ToLower() switch
                 {
                     "completed" => ReleaseStatus.Completed,
@@ -344,9 +344,8 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
                 var chapterId = uri.Split('/').Last();
                 var updatedAt = updateTime?.InnerText.Trim();
 
-                // Extract chapter number from title (e.g., "Chapter 10.5: Epilogue [END]")
-                var match = Regex.Match(title, @"Chapter\s+([\d\.]+)");
-                var number = match.Success ? (int)Math.Floor(Convert.ToDecimal(match.Groups[1].Value)) : 0;
+                var match = Regex.Match(title ?? "", @"Chapter\s+([\d\.]+)");
+                var number = match.Success && decimal.TryParse(match.Groups[1].Value, out var result) ? result : 0m;
                 var chapterBuilder = ChapterBuilder.Create();
 
                 chapterBuilder
