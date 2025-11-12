@@ -13,8 +13,7 @@
 		<PackageProjectUrl>https://github.com/KamiYomu/KamiYomu.CrawlerAgents.MangaKatana</PackageProjectUrl>
 		<RepositoryUrl>https://github.com/KamiYomu/KamiYomu.CrawlerAgents.MangaKatana</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<PackageTags>kamiyomu;crawler-agents;manga-download;mangakatana</PackageTags>
-		<PackageType>Analyzer;Dependency</PackageType>
+		<PackageTags>kamiyomu;kamiyomu-crawler-agents;manga-download;mangakatana</PackageTags>
 		<PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
 		<Copyright>© KamiYomu. Licensed under GPL-3.0.</Copyright>
 		<PackageIconUrl>https://raw.githubusercontent.com/KamiYomu/KamiYomu.CrawlerAgents.MangaKatana/main/src/KamiYomu.CrawlerAgents.MangaKatana/Resources/logo.png</PackageIconUrl>
