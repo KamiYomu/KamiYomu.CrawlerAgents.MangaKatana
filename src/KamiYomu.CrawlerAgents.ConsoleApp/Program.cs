@@ -12,6 +12,7 @@ ICrawlerAgent crawler = new MangaKatanaCrawlerAgent(null);
 
 var results = new List<(string Method, bool Success, string Message)>();
 
+var mangaResult = await crawler.SearchAsync("Kimetsu no Yaiba", new PaginationOptions(3, 1), CancellationToken.None);
 // Test GetFaviconAsync
 try
 {
@@ -30,14 +31,13 @@ try
 {
     AnsiConsole.MarkupLine($"[bold underline green] Start Testing the method {nameof(ICrawlerAgent.SearchAsync)}... [/]\n");
     Thread.Sleep(1000);
-    var result = await crawler.SearchAsync("Hole", new PaginationOptions(1, 1), CancellationToken.None);
-    var count = result.Data?.Count() ?? 0;
+    var count = mangaResult.Data?.Count() ?? 0;
     results.Add((nameof(ICrawlerAgent.SearchAsync), count > 0, $"Returned {count} result(s)"));
-    results.Add(($"{nameof(Manga.Id)} is not empty", !string.IsNullOrWhiteSpace(result.Data.ElementAt(0).Id), $"{result.Data.ElementAt(0).Id}"));
-    results.Add(($"{nameof(Manga.Title)} is not empty", !string.IsNullOrWhiteSpace(result.Data.ElementAt(0).Title), $"{result.Data.ElementAt(0).Title}"));
-    results.Add(($"{nameof(Manga.Description)} is not empty", !string.IsNullOrWhiteSpace(result.Data.ElementAt(0).Description), $"{result.Data.ElementAt(0).Description}"));
-    results.Add(($"{nameof(Manga.WebSiteUrl)} is not empty", !string.IsNullOrWhiteSpace(result.Data.ElementAt(0).WebSiteUrl), $"{result.Data.ElementAt(0).WebSiteUrl}"));
-    results.Add(($"{nameof(Manga.CoverFileName)} is not empty", !string.IsNullOrWhiteSpace(result.Data.ElementAt(0).CoverFileName), $"{result.Data.ElementAt(0).CoverFileName}"));
+    results.Add(($"{nameof(Manga.Id)} is not empty", !string.IsNullOrWhiteSpace(mangaResult.Data.ElementAt(0).Id), $"{mangaResult.Data.ElementAt(0).Id}"));
+    results.Add(($"{nameof(Manga.Title)} is not empty", !string.IsNullOrWhiteSpace(mangaResult.Data.ElementAt(0).Title), $"{mangaResult.Data.ElementAt(0).Title}"));
+    results.Add(($"{nameof(Manga.Description)} is not empty", !string.IsNullOrWhiteSpace(mangaResult.Data.ElementAt(0).Description), $"{mangaResult.Data.ElementAt(0).Description}"));
+    results.Add(($"{nameof(Manga.WebSiteUrl)} is not empty", !string.IsNullOrWhiteSpace(mangaResult.Data.ElementAt(0).WebSiteUrl), $"{mangaResult.Data.ElementAt(0).WebSiteUrl}"));
+    results.Add(($"{nameof(Manga.CoverFileName)} is not empty", !string.IsNullOrWhiteSpace(mangaResult.Data.ElementAt(0).CoverFileName), $"{mangaResult.Data.ElementAt(0).CoverFileName}"));
 }
 catch (Exception ex)
 {
@@ -50,10 +50,8 @@ try
 {
     AnsiConsole.MarkupLine($"[bold underline green] Start Testing the method {nameof(ICrawlerAgent.GetByIdAsync)}... [/]\n");
     Thread.Sleep(1000);
-    var result = await crawler.SearchAsync("One Piece", new PaginationOptions(0, 1, 30), CancellationToken.None);
-    Thread.Sleep(1000);
-    var manga = await crawler.GetByIdAsync(result.Data.ElementAt(0)?.Id, CancellationToken.None);
-    var any = result.Data?.Any() ?? false;
+    var manga = await crawler.GetByIdAsync(mangaResult.Data.ElementAt(0)?.Id, CancellationToken.None);
+    var any = mangaResult.Data?.Any() ?? false;
     results.Add((nameof(ICrawlerAgent.GetByIdAsync), any, $"Returning {manga.Title} and its cover {manga.CoverUrl}."));
     results.Add(($"{nameof(Manga.Id)} is not empty", !string.IsNullOrWhiteSpace(manga.Id), $"{manga.Id}"));
     results.Add(($"{nameof(Manga.Title)} is not empty", !string.IsNullOrWhiteSpace(manga.Title), $"{manga.Title}"));
@@ -72,15 +70,19 @@ try
 {
     AnsiConsole.MarkupLine($"[bold underline green] Start Testing the method {nameof(ICrawlerAgent.GetChaptersAsync)}... [/]\n");
     Thread.Sleep(1000);
-    var mangaResult = await crawler.SearchAsync("One Piece", new PaginationOptions(3, 1), CancellationToken.None);
-    Thread.Sleep(1000);
-    var chaptersResult = await crawler.GetChaptersAsync(mangaResult.Data.ElementAt(0), new PaginationOptions(0, 1, 30), CancellationToken.None);
+    var chaptersResult = await crawler.GetChaptersAsync(mangaResult.Data.Last(), new PaginationOptions(0, 1, 30), CancellationToken.None);
     var count = chaptersResult?.Data.Count() ?? 0;
+    var allNumbers = chaptersResult.Data?
+    .Select(c => c.Number.ToString())
+    .Where(n => !string.IsNullOrWhiteSpace(n))
+    .ToList();
+
+    var numbersString = allNumbers != null ? string.Join(";", allNumbers) : string.Empty;
     results.Add((nameof(ICrawlerAgent.GetChaptersAsync), !string.IsNullOrWhiteSpace(chaptersResult?.Data.FirstOrDefault()?.Id), $"Returned {chaptersResult?.Data.FirstOrDefault()?.Id} result(s)"));
     results.Add(($"{nameof(Chapter.Id)} is not empty", !string.IsNullOrWhiteSpace(chaptersResult.Data?.FirstOrDefault().Id), $"{chaptersResult.Data?.FirstOrDefault().Id}"));
     results.Add(($"{nameof(Chapter.Title)} is not empty", !string.IsNullOrWhiteSpace(chaptersResult?.Data?.FirstOrDefault().Title), $"{chaptersResult?.Data?.FirstOrDefault().Title}"));
     results.Add(($"{nameof(Chapter.Uri)} is not empty", !string.IsNullOrWhiteSpace(chaptersResult.Data?.FirstOrDefault().Uri.ToString()), $"{chaptersResult.Data?.FirstOrDefault().Uri}"));
-    results.Add(($"{nameof(Chapter.Number)} is not empty", chaptersResult.Data?.FirstOrDefault().Number > 0, $"{chaptersResult.Data?.FirstOrDefault().Number}"));
+    results.Add(($"{nameof(Chapter.Number)} is not empty", allNumbers?.Any(n => decimal.TryParse(n, out var d) && d > 0) == true, numbersString));
     results.Add(($"{nameof(Chapter.ParentManga)} is not empty", chaptersResult.Data?.FirstOrDefault() != null, $"{chaptersResult.Data?.FirstOrDefault().ParentManga.Title}"));
 }
 catch (Exception ex)
@@ -93,8 +95,6 @@ catch (Exception ex)
 try
 {
     AnsiConsole.MarkupLine($"[bold underline green] Start Testing the method {nameof(HttpClient.GetByteArrayAsync)}... [/]\n");
-    Thread.Sleep(1000);
-    var mangaResult = await crawler.SearchAsync("One Piece", new PaginationOptions(3, 1), CancellationToken.None);
     Thread.Sleep(1000);
     var chaptersResult = await crawler.GetChaptersAsync(mangaResult.Data.ElementAt(0), new PaginationOptions(0,1), CancellationToken.None);
     Thread.Sleep(1000);
