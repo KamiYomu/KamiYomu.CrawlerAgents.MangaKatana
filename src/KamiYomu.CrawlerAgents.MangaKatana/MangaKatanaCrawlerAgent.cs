@@ -133,10 +133,13 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
 
             List<Manga> mangas = [];
             HtmlNodeCollection nodes = document.DocumentNode.SelectNodes("//*[@id='book_list']/div[contains(@class, 'item')]");
-            foreach (var divNode in nodes)
+            if (nodes != null)
             {
-                Manga manga = ConvertToMangaFromList(divNode);
-                mangas.Add(manga);
+                foreach (var divNode in nodes)
+                {
+                    Manga manga = ConvertToMangaFromList(divNode);
+                    mangas.Add(manga);
+                }
             }
 
             return PagedResultBuilder<Manga>.Create()
@@ -265,8 +268,18 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
                     _ => ReleaseStatus.Unreleased
                 })
                 .WithYear(DateTime.TryParseExact(releaseDate, "MMM-dd-yyyy", null, System.Globalization.DateTimeStyles.None, out var releaseDateTime) ? releaseDateTime.Year : 0)
-                .WithIsFamilySafe(true);
+                .WithIsFamilySafe(!genres.Any(IsGenreNotFamilySafe));
             return mangaBuilder.Build();
+        }
+
+        private static bool IsGenreNotFamilySafe(string p)
+        {
+            if(string.IsNullOrWhiteSpace(p)) return false;   
+            return p.Contains("adult", StringComparison.OrdinalIgnoreCase)
+                || p.Contains("harem", StringComparison.OrdinalIgnoreCase)
+                || p.Contains("ecchi", StringComparison.OrdinalIgnoreCase)
+                || p.Contains("shota", StringComparison.OrdinalIgnoreCase)
+                || p.Contains("sexual", StringComparison.OrdinalIgnoreCase);
         }
 
         private static Manga ConvertToMangaFromSingleBook(HtmlNode rootNode, string id)
@@ -330,7 +343,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
                     _ => ReleaseStatus.Unreleased
                 })
                 .WithYear(DateTime.TryParseExact(releaseDate, "MMM-dd-yyyy", null, System.Globalization.DateTimeStyles.None, out var releaseDateTime) ? releaseDateTime.Year : 0)
-                .WithIsFamilySafe(true);
+                .WithIsFamilySafe(!genres.Any(IsGenreNotFamilySafe));
 
             return mangaBuilder.Build();
         }
