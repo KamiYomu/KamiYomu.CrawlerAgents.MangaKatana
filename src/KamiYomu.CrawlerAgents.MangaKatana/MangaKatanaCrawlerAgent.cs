@@ -3,6 +3,7 @@ using KamiYomu.CrawlerAgents.Core;
 using KamiYomu.CrawlerAgents.Core.Catalog;
 using KamiYomu.CrawlerAgents.Core.Catalog.Builders;
 using KamiYomu.CrawlerAgents.Core.Catalog.Definitions;
+using Microsoft.Extensions.Logging;
 using PuppeteerSharp;
 using System;
 using System.Collections.Generic;
@@ -18,33 +19,56 @@ using Page = KamiYomu.CrawlerAgents.Core.Catalog.Page;
 namespace KamiYomu.CrawlerAgents.MangaKatana
 {
     [DisplayName("KamiYomu Crawler Agent – mangakatana.com")]
-    public class MangaKatanaCrawlerAgent : AbstractCrawlerAgent, ICrawlerAgent
+    public class MangaKatanaCrawlerAgent : AbstractCrawlerAgent, ICrawlerAgent, IAsyncDisposable
     {
         private bool _disposed = false;
-        private HttpClient _httpClient;
-        private IBrowser _browser;
-
+        private Lazy<HttpClient> _httpClient;
+        private Lazy<Task<IBrowser>> _browser;
+        
         public MangaKatanaCrawlerAgent(IDictionary<string, object> options) : base(options)
         {
-            _httpClient = new HttpClient
+            _httpClient = new Lazy<HttpClient>(CreateHttpClient, true);
+            _browser = new Lazy<Task<IBrowser>>(CreateBrowserAsync, true);
+        }
+        public Task<IBrowser> GetBrowserAsync() => _browser.Value;
+
+        private async Task<IBrowser> CreateBrowserAsync()
+        {
+            var launchOptions = new LaunchOptions
             {
-                BaseAddress = new Uri("https://mangakatana.com")
+                Headless = true,
+                Timeout = TimeoutMilliseconds,
+                Args = ["--no-sandbox", "--disable-setuid-sandbox"]
             };
 
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(CrawlerAgentSettings.HttpUserAgent);
+            return await Puppeteer.LaunchAsync(launchOptions);
+        }
+
+
+        private HttpClient CreateHttpClient()
+        {
+            var httpClient = new HttpClient
+            {
+                BaseAddress = new Uri("https://mangakatana.com"),
+                Timeout = TimeSpan.FromMilliseconds(TimeoutMilliseconds)
+            };
+
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(HttpClientDefaultUserAgent);
+            return httpClient;
         }
 
         /// <inheritdoc/>
         public async Task<Manga> GetByIdAsync(string id, CancellationToken cancellationToken = default)
         {
-            await LoadBrowserAsync(cancellationToken);
-            using var page = await _browser.NewPageAsync();
+            var browser = await GetBrowserAsync();
+            using var page = await browser.NewPageAsync();
+            await page.SetUserAgentAsync(HttpClientDefaultUserAgent);
 
-            var finalUrl = new Uri(_httpClient.BaseAddress, $"manga/{id}").ToString();
+            var finalUrl = new Uri(_httpClient.Value.BaseAddress, $"manga/{id}").ToString();
             var response = await page.GoToAsync(finalUrl, new NavigationOptions
             {
                 WaitUntil = [WaitUntilNavigation.Networkidle0],
-                Timeout = 60000 // 60 seconds
+                Timeout = TimeoutMilliseconds
             });
 
             var content = await response.TextAsync();
@@ -59,14 +83,14 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
         /// <inheritdoc/>
         public async Task<IEnumerable<Page>> GetChapterPagesAsync(Chapter chapter, CancellationToken cancellationToken = default)
         {
-            await LoadBrowserAsync(cancellationToken);
-            using var page = await _browser.NewPageAsync();
-
+            var browser = await GetBrowserAsync();
+            using var page = await browser.NewPageAsync();
+            await page.SetUserAgentAsync(HttpClientDefaultUserAgent);
             // Wait for full page load including JS execution
             var response = await page.GoToAsync(chapter.Uri.ToString(), new NavigationOptions
             {
                 WaitUntil = [WaitUntilNavigation.Networkidle0],
-                Timeout = 60000 // 60 seconds
+                Timeout = TimeoutMilliseconds
             });
 
             var content = await page.GetContentAsync();
@@ -80,9 +104,9 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
         /// <inheritdoc/>
         public async Task<PagedResult<Manga>> SearchAsync(string titleName, PaginationOptions paginationOptions, CancellationToken cancellationToken)
         {
-
-            await LoadBrowserAsync(cancellationToken);
-            using var page = await _browser.NewPageAsync();
+            var browser = await GetBrowserAsync();
+            using var page = await browser.NewPageAsync();
+            await page.SetUserAgentAsync(HttpClientDefaultUserAgent);
 
             var queryParams = new Dictionary<string, string>
             {
@@ -90,7 +114,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
                 ["search_by"] = "book_name"
             };
             var encodedQuery = new FormUrlEncodedContent(queryParams).ReadAsStringAsync(cancellationToken).Result;
-            var builder = new UriBuilder(_httpClient.BaseAddress)
+            var builder = new UriBuilder(_httpClient.Value.BaseAddress)
             {
                 Query = encodedQuery
             };
@@ -100,7 +124,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
             var response = await page.GoToAsync(finalUrl, new NavigationOptions
             {
                 WaitUntil = [WaitUntilNavigation.Networkidle0],
-                Timeout = 60000 // 60 seconds
+                Timeout = TimeoutMilliseconds
             });
 
             var content = await response.TextAsync();
@@ -124,14 +148,15 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
         /// <inheritdoc/>
         public async Task<PagedResult<Chapter>> GetChaptersAsync(Manga manga, PaginationOptions paginationOptions, CancellationToken cancellationToken)
         {
-            await LoadBrowserAsync(cancellationToken);
-            using var page = await _browser.NewPageAsync();
+            var browser = await GetBrowserAsync();
+            using var page = await browser.NewPageAsync();
+            await page.SetUserAgentAsync(HttpClientDefaultUserAgent);
 
-            var finalUrl = new Uri(_httpClient.BaseAddress, $"manga/{manga.Id}").ToString();
+            var finalUrl = new Uri(_httpClient.Value.BaseAddress, $"manga/{manga.Id}").ToString();
             var response = await page.GoToAsync(finalUrl, new NavigationOptions
             {
                 WaitUntil = [WaitUntilNavigation.Networkidle0],
-                Timeout = 60000 // 60 seconds
+                Timeout = TimeoutMilliseconds
             });
 
             var content = await response.TextAsync();
@@ -151,19 +176,6 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
         public Task<Uri> GetFaviconAsync(CancellationToken cancellationToken = default)
         {
             return Task.FromResult(new Uri("https://mangakatana.com/static/img/fav.png"));
-        }
-
-        private async Task LoadBrowserAsync(CancellationToken cancellationToken)
-        {
-            if (_browser != null) return;
-            var launchOptions = new LaunchOptions
-            {
-                Headless = true,
-                ExecutablePath = "/usr/bin/chromium",
-                Args = ["--no-sandbox", "--disable-setuid-sandbox"]
-            };
-
-            _browser ??= await Puppeteer.LaunchAsync(launchOptions);
         }
 
 
@@ -211,7 +223,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
             // URL and Title
             var titleNode = divNode.SelectSingleNode(".//h3[@class='title']/a");
             var url = titleNode?.GetAttributeValue("href", string.Empty);
-            var title = titleNode?.InnerText.Trim();
+            var title = string.IsNullOrEmpty(titleNode?.InnerText.Trim()) ? "Untitled Manga" : titleNode?.InnerText.Trim();
             var id = url?.Split('/').Last();
             // Cover image
             var coverNode = divNode.SelectSingleNode(".//div[@class='wrap_img']//img");
@@ -253,7 +265,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
                     _ => ReleaseStatus.Unreleased
                 })
                 .WithYear(DateTime.TryParseExact(releaseDate, "MMM-dd-yyyy", null, System.Globalization.DateTimeStyles.None, out var releaseDateTime) ? releaseDateTime.Year : 0)
-                .WithContentRating("");
+                .WithIsFamilySafe(true);
             return mangaBuilder.Build();
         }
 
@@ -263,7 +275,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
 
             // Title and URL
             var titleNode = rootNode.SelectSingleNode(".//h1[@class='heading']");
-            var title = titleNode?.InnerText.Trim();
+            var title = string.IsNullOrEmpty(titleNode?.InnerText.Trim()) ? "Untitled Manga" : titleNode?.InnerText.Trim();
 
             var url = rootNode.SelectSingleNode(".//a[contains(@class, 'fc_bt')]")
                               ?.GetAttributeValue("href", string.Empty);
@@ -318,7 +330,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
                     _ => ReleaseStatus.Unreleased
                 })
                 .WithYear(DateTime.TryParseExact(releaseDate, "MMM-dd-yyyy", null, System.Globalization.DateTimeStyles.None, out var releaseDateTime) ? releaseDateTime.Year : 0)
-                .WithContentRating("");
+                .WithIsFamilySafe(true);
 
             return mangaBuilder.Build();
         }
@@ -339,7 +351,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
                 if (chapterLink == null)
                     continue;
 
-                var title = chapterLink.InnerText.Trim();
+                var title = string.IsNullOrEmpty(chapterLink?.InnerText.Trim()) ? "Untitled Chapter" : chapterLink?.InnerText.Trim(); 
                 var uri = chapterLink.GetAttributeValue("href", string.Empty);
                 var chapterId = uri.Split('/').Last();
                 var updatedAt = updateTime?.InnerText.Trim();
@@ -375,11 +387,51 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
 
             if (disposing)
             {
-                _httpClient?.Dispose();
-                _browser?.Dispose();
+                if (_httpClient.IsValueCreated)
+                {
+                    _httpClient.Value.Dispose();
+                }
+
+                if (_browser.IsValueCreated)
+                {
+                    var browserTask = _browser.Value;
+                    if (browserTask.IsCompletedSuccessfully)
+                    {
+                        browserTask.Result.Dispose();
+                    }
+                }
             }
+
             _disposed = true;
         }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+                return;
+
+            if (_httpClient.IsValueCreated)
+            {
+                _httpClient.Value.Dispose();
+            }
+
+            if (_browser.IsValueCreated)
+            {
+                try
+                {
+                    var browser = await _browser.Value;
+                    await browser.CloseAsync();
+                    await browser.DisposeAsync();
+                }
+                catch(Exception ex)
+                {
+                    Logger?.LogError("{crawler}, Error disposing browser: {Message}", nameof(MangaKatanaCrawlerAgent), ex.Message);
+                }
+            }
+
+            _disposed = true;
+        }
+
 
         ~MangaKatanaCrawlerAgent()
         {

@@ -34,7 +34,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="KamiYomu.CrawlerAgents.Core" Version="1.1.1" />
+		<PackageReference Include="KamiYomu.CrawlerAgents.Core" Version="1.1.4" />
 	</ItemGroup>
 	
 	<Import Project="KamiYomu.CrawlerAgents.MangaKatana.props" />
