@@ -108,13 +108,17 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
             using var page = await browser.NewPageAsync();
             await page.SetUserAgentAsync(HttpClientDefaultUserAgent);
 
+            var pageNumber = string.IsNullOrWhiteSpace(paginationOptions?.ContinuationToken)
+                ? 1
+                : int.Parse(paginationOptions.ContinuationToken);
+
             var queryParams = new Dictionary<string, string>
             {
                 ["search"] = titleName,
                 ["search_by"] = "book_name"
             };
             var encodedQuery = new FormUrlEncodedContent(queryParams).ReadAsStringAsync(cancellationToken).Result;
-            var builder = new UriBuilder(_httpClient.Value.BaseAddress)
+            var builder = new UriBuilder(new Uri(_httpClient.Value.BaseAddress, $"page/{pageNumber}"))
             {
                 Query = encodedQuery
             };
@@ -144,7 +148,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
 
             return PagedResultBuilder<Manga>.Create()
                 .WithData(mangas)
-                .WithPaginationOptions(new PaginationOptions(mangas.Count(), mangas.Count(), mangas.Count()))
+                .WithPaginationOptions(new PaginationOptions((pageNumber + 1).ToString()))
                 .Build();
         }
 
@@ -378,6 +382,7 @@ namespace KamiYomu.CrawlerAgents.MangaKatana
                     .WithTitle(title)
                     .WithParentManga(manga)
                     .WithVolume(0)
+                    .WithTranslatedLanguage("en")
                     .WithNumber(number)
                     .WithUri(new Uri(uri));
 
